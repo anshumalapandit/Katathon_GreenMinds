@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html class='use-all-space'>
+<head>
+    <meta http-equiv='X-UA-Compatible' content='IE=Edge' />
+    <meta charset='UTF-8'>
+    <title>India Map - ERS Navigation (Green Theme)</title>
+    <meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'/>
+
+    <!-- TomTom Map CSS -->
+    <link rel='stylesheet' href='https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.25.1/maps/maps.css' />
+
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html,body,#map{height:100%; font-family: 'Inter', 'Segoe UI', Tahoma, Roboto, sans-serif;}
+        body{display:flex; background:#FFFFFF; color:#000; overflow:hidden;}
+
+        /* SIDEBAR WHITE + GREEN THEME */
+        .sidebar {
+            width:460px;
+            min-width:320px;
+            background: #ffffff;
+            border-right:3px solid #c6ffe6;
+            display:flex;
+            flex-direction:column;
+            z-index:1200;
+            overflow:auto;
+            padding-bottom:30px;
+        }
+        .sidebar-header {
+            padding:20px;
+            border-bottom:3px solid #c6ffe6;
+            background:#eafff3;
+        }
+        .sidebar-header h1 {
+            font-size:22px; color:#004d2b; font-weight:800;
+        }
+        .sidebar-header p {
+            font-size:12px; color:#0b5137; opacity:0.8;
+        }
+
+        .search-section { padding:18px; }
+        label.control { display:block; font-size:13px; color:#004d2b; margin-bottom:6px; font-weight:700;}
+        .input {
+            width:100%; padding:12px 14px; border-radius:8px;
+            border:2px solid #b8f5d6; background:#f4fffa; color:#00331f; font-size:14px;
+        }
+
+        .button-group { display:flex; gap:10px; margin-top:12px; }
+        .btn {
+            flex:1; padding:12px; border-radius:8px; border:none;
+            font-weight:700; cursor:pointer; text-transform:uppercase;
+        }
+        .btn.primary {
+            background:#00c47a; color:white;
+        }
+
+        .clear-btn {
+            margin:12px 18px; padding:10px; border-radius:8px;
+            background:#f3f3f3; border:1px solid #ccc; color:#00331f;
+        }
+
+        .traffic-toggle { padding:14px 18px; display:flex; align-items:center; gap:10px; }
+        .traffic-toggle label { color:#00331f; font-size:14px; }
+
+        .panel {
+            margin:14px 18px; padding:16px; border-radius:10px;
+            background:#f4fffa; border:2px solid #c6ffe6;
+        }
+        .panel h3 {
+            margin-bottom:12px; color:#004d2b; font-size:14px; font-weight:800;
+        }
+
+        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .metric {
+            padding:12px; border-radius:8px;
+            background:#ffffff; border:2px solid #c6ffe6;
+            text-align:center; color:#004d2b;
+        }
+        .metric .value { font-size:18px; font-weight:800; }
+        .metric .label { font-size:11px; opacity:0.7; }
+
+        /* AQI Cards */
+        .metric-card {
+            padding:12px; border-radius:8px;
+            background:#ffffff; border:2px solid #c6ffe6;
+            text-align:center;
+        }
+        .metric-card .big { font-size:18px; font-weight:800; color:#004d2b; }
+        .metric-card .lbl { font-size:11px; color:#004d2b; opacity:0.7; }
+
+        /* ERS Panel */
+        .ers-box {
+            text-align:center;
+            padding:18px;
+            border-radius:10px;
+            background:#e9fff4;
+            border:2px solid #c6ffe6;
+        }
+        .ers-value { font-size:44px; font-weight:900; color:#004d2b; }
+        .risk-badge {
+            padding:8px 12px; border-radius:20px; font-weight:800;
+            display:inline-block; margin-top:8px;
+        }
+        .badge-low { background:#d9ffeb; color:#00723e; border:2px solid #00c47a; }
+        .badge-moderate { background:#fff5d9; color:#8a6d00; border:2px solid #ffde4d; }
+        .badge-high { background:#ffe2d9; color:#b83a00; border:2px solid #ff6b35; }
+
+        /* Map */
+        #map { flex:1; width:100%; height:100%; }
+
+        @media(max-width:900px) {
+            .sidebar { width:100%; position:absolute; height:47vh; }
+            #map { height:53vh; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+
+    <div class="sidebar-header">
+        <h1>🗺️ ERS Navigation</h1>
+        <p>Environmental Risk Score & Route Analyzer</p>
+    </div>
+
+    <div class="search-section">
+        <label class="control">Source Location</label>
+        <input id="source" class="input" type="text" placeholder="Enter source or click on map">
+        <div id="sourceSuggestions" class="suggestion-box"></div>
+
+        <label class="control" style="margin-top:10px;">Destination Location</label>
+        <input id="destination" class="input" type="text" placeholder="Enter destination">
+        <div id="destSuggestions" class="suggestion-box"></div>
+
+        <div class="button-group">
+            <button class="btn primary" id="getRouteBtn">Get Route</button>
+            <button class="btn primary" id="analyzeBtn">Analyze</button>
+        </div>
+
+        <button class="clear-btn" id="clearBtn">Clear Route</button>
+    </div>
+
+    <div class="traffic-toggle">
+        <input type="checkbox" id="trafficToggle">
+        <label for="trafficToggle">Show Traffic</label>
+    </div>
+
+    <!-- ⭐ NEW WEATHER SELECTOR PANEL HERE ⭐ -->
+    <div class="panel">
+        <h3>🌍 Weather & AQI Source</h3>
+
+        <label style="font-weight:700;">Select Location</label>
+        <select id="weatherSelect"
+            style="width:100%;padding:10px;border-radius:8px;border:2px solid #c6ffe6;
+                   background:#f0fffa;font-weight:600;color:#00331f;">
+            <option value="current">Current Location</option>
+            <option value="source">Source Location</option>
+            <option value="destination">Destination Location</option>
+        </select>
+
+        <button id="loadWeatherBtn"
+            style="width:100%;margin-top:12px;padding:10px;border:none;border-radius:8px;
+                   background:#00c47a;color:white;font-weight:700;cursor:pointer;">
+            Show Weather & AQI
+        </button>
+    </div>
+
+    <!-- CURRENT WEATHER -->
+    <div class="panel">
+        <h3>🌤️ Current Weather</h3>
+        <div class="grid2">
+            <div class="metric"><div class="value" id="temp">--°C</div><div class="label">Temperature</div></div>
+            <div class="metric"><div class="value" id="humidity">--%</div><div class="label">Humidity</div></div>
+            <div class="metric"><div class="value" id="windSpeed">--</div><div class="label">Wind</div></div>
+            <div class="metric"><div class="value" id="pressure">--</div><div class="label">Pressure</div></div>
+        </div>
+    </div>
+
+    <!-- AQI -->
+    <div class="panel">
+        <h3>🌬️ Air Quality Index</h3>
+        <div style="font-size:34px;font-weight:900;color:#004d2b;" id="aqiValue">--</div>
+        <div style="font-size:13px;color:#004d2b;opacity:0.75;" id="aqiStatus">--</div>
+
+        <div class="grid2" style="margin-top:10px;">
+            <div class="metric-card"><div class="big" id="pm25">--</div><div class="lbl">PM2.5</div></div>
+            <div class="metric-card"><div class="big" id="pm10">--</div><div class="lbl">PM10</div></div>
+            <div class="metric-card"><div class="big" id="no2">--</div><div class="lbl">NO₂</div></div>
+            <div class="metric-card"><div class="big" id="o3">--</div><div class="lbl">O₃</div></div>
+        </div>
+    </div>
+
+    <!-- ANALYSIS -->
+    <div class="panel" id="analysisPanel" style="display:none;">
+        <h3>Environmental Impact</h3>
+
+        <div class="ers-box">
+            <div class="ers-value" id="ersScore">--</div>
+            <div style="font-size:12px;color:#004d2b;">Overall ERS</div>
+            <div id="riskBadge" class="risk-badge badge-low">Low Risk</div>
+        </div>
+
+        <div class="grid2" style="margin-top:10px;">
+            <div class="metric-card"><div class="big" id="congestion">--%</div><div class="lbl">Congestion</div></div>
+            <div class="metric-card"><div class="big" id="fuelBurn">--</div><div class="lbl">Fuel</div></div>
+            <div class="metric-card"><div class="big" id="co2">--</div><div class="lbl">CO₂</div></div>
+            <div class="metric-card"><div class="big" id="nox">--</div><div class="lbl">NOₓ</div></div>
+        </div>
+
+        <div class="panel" id="routeInfo" style="margin-top:14px;display:none;background:#ffffff;">
+            <strong>Distance:</strong> <span id="distanceValue">--</span> km<br>
+            <strong>Duration:</strong> <span id="durationValue">--</span> min
+        </div>
+    </div>
+
+</div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- TomTom Scripts -->
+<script src='https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.25.1/maps/maps-web.min.js'></script>
+<script src='https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.25.1/services/services-web.min.js'></script>
+
+<!-- PART 2 (FULL JAVASCRIPT) WILL BE SENT IN NEXT MESSAGE -->
+<script>
+/* =========================
+   PART 2: JavaScript
+   Paste this after TomTom scripts
+   ========================= */
+
+// CONFIG - keep your keys here (from the HTML)
+const API_KEY = 'LxGeVBqp9HRFuVcG9C8wGLZvmVtedXdb';
+const WEATHER_API_KEY = 'f4f5a20348dc6c0a0b3fb49989172800';
+
+// Initialize map
+function isMobileOrTablet() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+const map = tt.map({
+  key: API_KEY,
+  container: 'map',
+  center: [78.9629, 20.5937],
+  zoom: 4,
+  dragPan: !isMobileOrTablet()
+});
+map.addControl(new tt.FullscreenControl());
+map.addControl(new tt.NavigationControl());
+
+// global state
+window.sourceCoords = null; // [lng, lat]
+window.destCoords = null;
+let sourceMarker = null;
+let destMarker = null;
+
+// --- SEARCH (TomTom) ---
+async function searchLocation(query) {
+  if (!query || query.length < 2) return [];
+  try {
+    const res = await fetch(`https://api.tomtom.com/search/2/search/${encodeURIComponent(query)}.json?key=${API_KEY}&countrySet=IN&limit=5`);
+    const j = await res.json();
+    return j.results || [];
+  } catch (err) {
+    console.error('Search error', err);
+    return [];
+  }
+}
+
+// wire input suggestions for source/destination
+const sourceInput = document.getElementById('source');
+const destInput = document.getElementById('destination');
+const sourceBox = document.getElementById('sourceSuggestions');
+const destBox = document.getElementById('destSuggestions');
+
+let sTimer = null, dTimer = null;
+sourceInput.addEventListener('input', () => {
+  clearTimeout(sTimer);
+  sTimer = setTimeout(async () => {
+    const q = sourceInput.value;
+    if (!q || q.length < 2) { sourceBox.style.display = 'none'; return; }
+    const results = await searchLocation(q);
+    sourceBox.innerHTML = '';
+    results.forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.textContent = r.address && r.address.freeformAddress ? r.address.freeformAddress : (r.poi && r.poi.name ? r.poi.name : r.type);
+      item.onclick = () => {
+        sourceInput.value = item.textContent;
+        sourceBox.style.display = 'none';
+        window.sourceCoords = [r.position.lon, r.position.lat];
+        if (sourceMarker) sourceMarker.remove();
+        sourceMarker = new tt.Marker({ color: '#00c47a' }).setLngLat(window.sourceCoords).addTo(map);
+        map.flyTo({ center: window.sourceCoords, zoom: 12 });
+      };
+      sourceBox.appendChild(item);
+    });
+    sourceBox.style.display = results.length ? 'block' : 'none';
+  }, 240);
+});
+
+destInput.addEventListener('input', () => {
+  clearTimeout(dTimer);
+  dTimer = setTimeout(async () => {
+    const q = destInput.value;
+    if (!q || q.length < 2) { destBox.style.display = 'none'; return; }
+    const results = await searchLocation(q);
+    destBox.innerHTML = '';
+    results.forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.textContent = r.address && r.address.freeformAddress ? r.address.freeformAddress : (r.poi && r.poi.name ? r.poi.name : r.type);
+      item.onclick = () => {
+        destInput.value = item.textContent;
+        destBox.style.display = 'none';
+        window.destCoords = [r.position.lon, r.position.lat];
+        if (destMarker) destMarker.remove();
+        destMarker = new tt.Marker({ color: '#ff6b6b' }).setLngLat(window.destCoords).addTo(map);
+        map.flyTo({ center: window.destCoords, zoom: 12 });
+      };
+      destBox.appendChild(item);
+    });
+    destBox.style.display = results.length ? 'block' : 'none';
+  }, 240);
+});
+
+// hide suggestion boxes when clicking out
+document.addEventListener('click', (ev) => {
+  if (!ev.target.closest('.search-section') && !ev.target.closest('.suggestion-box')) {
+    sourceBox.style.display = 'none';
+    destBox.style.display = 'none';
+  }
+});
+
+// --- MAP CLICK TO SET SOURCE/DEST ---
+let clickCount = 0;
+map.on('click', (e) => {
+  clickCount++;
+  const lng = e.lngLat.lng, lat = e.lngLat.lat;
+  if (clickCount % 2 === 1) {
+    // set source
+    window.sourceCoords = [lng, lat];
+    sourceInput.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    if (sourceMarker) sourceMarker.remove();
+    sourceMarker = new tt.Marker({ color: '#00c47a' }).setLngLat(window.sourceCoords).addTo(map);
+    // optionally auto-select "source" in weather selector (commented out; you can enable)
+    // document.getElementById('weatherSelect').value = 'source';
+    // fetchWeatherForSelection(); // if you want instant load
+  } else {
+    // set destination
+    window.destCoords = [lng, lat];
+    destInput.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    if (destMarker) destMarker.remove();
+    destMarker = new tt.Marker({ color: '#ff6b6b' }).setLngLat(window.destCoords).addTo(map);
+    // document.getElementById('weatherSelect').value = 'destination';
+  }
+});
+
+// --- TOGGLE TRAFFIC ---
+document.getElementById('trafficToggle').addEventListener('change', (e) => {
+  const checked = e.target.checked;
+  const styleUrl = checked
+    ? `https://api.tomtom.com/map/1/style/25.2.3-0/hybrid_main.json?key=${API_KEY}&traffic=true`
+    : `https://api.tomtom.com/map/1/style/25.2.3-0/hybrid_main.json?key=${API_KEY}`;
+  map.setStyle(styleUrl);
+});
+
+// --- FETCH WEATHER + AIR POLLUTION (OpenWeather) ---
+async function fetchWeatherData(lat = 20.5937, lon = 78.9629) {
+  try {
+    // Current weather
+    const wResp = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`);
+    const w = await wResp.json();
+    if (w && w.main) {
+      document.getElementById('temp').textContent = Math.round(w.main.temp) + '°C';
+      document.getElementById('humidity').textContent = (w.main.humidity || '--') + '%';
+      document.getElementById('windSpeed').textContent = ((w.wind && w.wind.speed) ? w.wind.speed.toFixed(2) : '--') + ' m/s';
+      document.getElementById('pressure').textContent = (w.main.pressure || '--') + ' hPa';
+      if (w.wind && typeof w.wind.deg !== 'undefined') {
+        document.getElementById('windSpeed').dataset.winddeg = w.wind.deg;
+      } else {
+        document.getElementById('windSpeed').dataset.winddeg = '';
+      }
+    }
+
+    // Air pollution (AQI)
+    const pResp = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}`);
+    const p = await pResp.json();
+    if (p && p.list && p.list[0]) {
+      const aqi = p.list[0].main.aqi; // 1-5
+      const comps = p.list[0].components || {};
+      const aqiLevels = ['Good','Fair','Moderate','Poor','Very Poor'];
+      const aqiColors = ['#22c55e','#facc15','#f97316','#ef4444','#991b1b'];
+
+      document.getElementById('aqiValue').textContent = aqi;
+      document.getElementById('aqiStatus').textContent = 'Air Quality: ' + (aqiLevels[aqi - 1] || 'Unknown');
+      document.getElementById('aqiValue').style.color = aqiColors[aqi - 1] || '#004d2b';
+
+      document.getElementById('pm25').textContent = (comps.pm2_5 || 0).toFixed(1);
+      document.getElementById('pm10').textContent = (comps.pm10 || 0).toFixed(1);
+      document.getElementById('no2').textContent = (comps.no2 || 0).toFixed(1);
+      document.getElementById('o3').textContent = (comps.o3 || 0).toFixed(1);
+
+      // store last pollution if needed for further analysis
+      window._lastPollution = { aqi, comps, lat, lon };
+    } else {
+      // clear fields if none
+      document.getElementById('aqiValue').textContent = '--';
+      document.getElementById('aqiStatus').textContent = 'Air Quality: Unknown';
+      document.getElementById('pm25').textContent = '--';
+      document.getElementById('pm10').textContent = '--';
+      document.getElementById('no2').textContent = '--';
+      document.getElementById('o3').textContent = '--';
+    }
+  } catch (err) {
+    console.error('Weather/AQ error:', err);
+    alert('Failed to load weather or air quality. See console for details.');
+  }
+}
+
+// --- Helper: get coords for weather selection ---
+async function getCoordsForWeatherSelection() {
+  const val = document.getElementById('weatherSelect').value;
+  if (val === 'current') {
+    // try geolocation with fallback to map center
+    if (navigator.geolocation) {
+      try {
+        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000 }));
+        return { lat: pos.coords.latitude, lon: pos.coords.longitude, label: 'Current Location' };
+      } catch (e) {
+        const center = map.getCenter();
+        return { lat: center.lat, lon: center.lng, label: 'Map center (fallback)' };
+      }
+    } else {
+      const center = map.getCenter();
+      return { lat: center.lat, lon: center.lng, label: 'Map center' };
+    }
+  }
+  if (val === 'source') {
+    if (!window.sourceCoords) return null;
+    return { lat: window.sourceCoords[1], lon: window.sourceCoords[0], label: 'Source' };
+  }
+  if (val === 'destination') {
+    if (!window.destCoords) return null;
+    return { lat: window.destCoords[1], lon: window.destCoords[0], label: 'Destination' };
+  }
+  return null;
+}
+
+// --- Load weather for chosen selection ---
+async function loadWeatherForSelection() {
+  const coords = await getCoordsForWeatherSelection();
+  if (!coords) {
+    alert('Coordinates not available for the selected target. Make sure you set Source/Destination on the map or choose Current Location.');
+    return;
+  }
+  await fetchWeatherData(coords.lat, coords.lon);
+  // optionally center map to target for preview
+  map.flyTo({ center: [coords.lon, coords.lat], zoom: 10 });
+}
+
+// wire Show Weather & AQI button
+document.getElementById('loadWeatherBtn').addEventListener('click', loadWeatherForSelection);
+
+// load initial weather for current location on page load (small delay)
+window.addEventListener('load', () => {
+  document.getElementById('weatherSelect').value = 'current';
+  setTimeout(async () => {
+    const coords = await getCoordsForWeatherSelection();
+    if (coords) fetchWeatherData(coords.lat, coords.lon);
+  }, 300);
+});
+
+// --- ROUTING (TomTom) ---
+async function getRoute() {
+  if (!window.sourceCoords || !window.destCoords) {
+    alert('Select both source and destination (click map or use search).');
+    return;
+  }
+  try {
+    const url = `https://api.tomtom.com/routing/1/calculateRoute/${window.sourceCoords[1]},${window.sourceCoords[0]}:${window.destCoords[1]},${window.destCoords[0]}/json?key=${API_KEY}`;
+    const r = await fetch(url);
+    const j = await r.json();
+    if (!j.routes || !j.routes.length) { alert('No route found'); return; }
+    const route = j.routes[0];
+    // Try extracting coords from legs.points if present
+    let coords = [];
+    if (route.legs && Array.isArray(route.legs) && route.legs.length) {
+      route.legs.forEach(leg => {
+        if (leg.points && Array.isArray(leg.points)) {
+          leg.points.forEach(p => {
+            if (typeof p.longitude === 'number' && typeof p.latitude === 'number') {
+              coords.push([p.longitude, p.latitude]);
+            }
+          });
+        }
+      });
+    }
+    // If no coords, try route.geometry decoding (left empty for now)
+    if (!coords.length && route.geometry) {
+      // route.geometry may be encoded - decode if needed later
+      // fallback: try route.summary if shape not present
+      console.warn('Route geometry present but not decoded (coords empty).');
+    }
+
+    // draw route
+    addRouteToMap(coords);
+
+    if (route.summary) {
+      const distanceKm = (route.summary.lengthInMeters / 1000).toFixed(2);
+      const timeMin = Math.round(route.summary.travelTimeInSeconds / 60);
+      document.getElementById('distanceValue').textContent = distanceKm;
+      document.getElementById('durationValue').textContent = timeMin;
+      document.getElementById('routeInfo').style.display = 'block';
+      document.getElementById('analysisPanel').style.display = 'block';
+    }
+  } catch (err) {
+    console.error('Routing error', err);
+    alert('Routing error. See console.');
+  }
+}
+
+function addRouteToMap(coords) {
+  try { if (map.getLayer('route-layer')) map.removeLayer('route-layer'); } catch (e) {}
+  try { if (map.getSource('route')) map.removeSource('route'); } catch (e) {}
+  if (!coords || !coords.length) return;
+  const geo = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } };
+  map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [geo] } });
+  map.addLayer({ id: 'route-layer', type: 'line', source: 'route', paint: { 'line-color': '#00c47a', 'line-width': 5 } });
+  // fit bounds
+  const bounds = coords.reduce((b, c) => b.extend(c), new tt.LngLatBounds(coords[0], coords[0]));
+  map.fitBounds(bounds, { padding: 80 });
+}
+
+// wire Get Route button
+document.getElementById('getRouteBtn').addEventListener('click', getRoute);
+
+// --- ANALYZE (ERS) ---
+async function fetchMockTraffic() {
+  // stub: replace with TomTom Traffic Flow / Segment API for accurate data
+  return { current_speed: 28, free_flow: 60, volume: 1200 };
+}
+
+function clamp(v, a=0, b=100) { return Math.max(a, Math.min(b, v)); }
+
+function computeERSFromMock(traffic, weather, aq) {
+  const cs = clamp((1 - (traffic.current_speed / traffic.free_flow)) * 100);
+  const histMedian = traffic.free_flow * 0.9;
+  const asd = clamp(Math.abs(traffic.current_speed - histMedian) / histMedian * 100);
+  let fuel_rate = 4;
+  if (traffic.current_speed < 15) fuel_rate = 8;
+  else if (traffic.current_speed < 40) fuel_rate = 6;
+  else fuel_rate = 4;
+  const vcount = Math.max(traffic.volume || 600, 200);
+  const fuel_lph = (fuel_rate * (vcount / 100));
+  const co2 = fuel_lph * 2.31;
+  const nox = fuel_lph * 10;
+  const wind = Math.max(0.5, weather.wind_speed || 1);
+  const dispersion = clamp((nox / 200) * (1 + Math.max(0, (1 - wind / 5))) * 50);
+  const noise_db = clamp(50 + 10 * Math.log10(Math.max(1, vcount)) * (traffic.current_speed / 50), 40, 110);
+  const aqi_norm = clamp(((aq.aqi || 3) / 5) * 100);
+
+  const fuel_norm = clamp((fuel_lph / 10) * 100);
+  const co2_norm = clamp((co2 / 60) * 100);
+  const noise_norm = clamp((noise_db - 40) / (90 - 40) * 100);
+
+  const ers = Math.round((0.20 * cs) + (0.15 * asd) + (0.15 * fuel_norm) + (0.20 * co2_norm) + (0.10 * dispersion) + (0.10 * noise_norm) + (0.10 * aqi_norm));
+
+  return {
+    ers,
+    cs: Math.round(cs),
+    asd: Math.round(asd),
+    fuel_lph: Number(fuel_lph.toFixed(2)),
+    co2: Number(co2.toFixed(2)),
+    nox: Math.round(nox),
+    dispersion: Math.round(dispersion),
+    noise_db: Math.round(noise_db),
+    aqi: aq.aqi || 3
+  };
+}
+
+document.getElementById('analyzeBtn').addEventListener('click', async () => {
+  const traffic = await fetchMockTraffic();
+  const windText = document.getElementById('windSpeed').textContent;
+  const wind_speed = parseFloat(windText) || 1;
+  const aqiVal = parseInt(document.getElementById('aqiValue').textContent) || 3;
+  const pm25 = parseFloat(document.getElementById('pm25').textContent) || 0;
+  const pm10 = parseFloat(document.getElementById('pm10').textContent) || 0;
+  const no2 = parseFloat(document.getElementById('no2').textContent) || 0;
+  const o3 = parseFloat(document.getElementById('o3').textContent) || 0;
+  const weather = { wind_speed };
+  const aq = { aqi: aqiVal, pm2_5: pm25, pm10, no2, o3 };
+  const res = computeERSFromMock(traffic, weather, aq);
+
+  document.getElementById('ersScore').textContent = res.ers;
+  const badge = document.getElementById('riskBadge');
+  badge.textContent = `/100 ${res.ers > 80 ? 'Very High' : res.ers > 60 ? 'High' : res.ers > 35 ? 'Moderate' : 'Low'} Risk`;
+  badge.className = 'risk-badge ' + (res.ers > 80 ? 'badge-very' : res.ers > 60 ? 'badge-high' : res.ers > 35 ? 'badge-moderate' : 'badge-low');
+
+  document.getElementById('aiText')?.textContent && (document.getElementById('aiText').textContent = `ERS ${res.ers}/100 — Top contributors: congestion ${res.cs}, CO₂ ${res.co2} kg/h, noise ${res.noise_db} dB.`);
+  document.getElementById('congestion').textContent = res.cs + '%';
+  document.getElementById('fuelBurn').textContent = res.fuel_lph;
+  document.getElementById('co2').textContent = res.co2;
+  document.getElementById('nox').textContent = res.nox;
+  document.getElementById('analysisPanel').style.display = 'block';
+  document.getElementById('routeInfo').style.display = 'block';
+
+  // optional: plume preview
+  const windDeg = document.getElementById('windSpeed').dataset.winddeg ? parseFloat(document.getElementById('windSpeed').dataset.winddeg) : 150;
+  drawPlume(windDeg);
+});
+
+// Draw a simple plume on the map (demo)
+function drawPlume(windDeg = 150) {
+  try { if (map.getLayer('plume')) map.removeLayer('plume'); } catch(e) {}
+  try { if (map.getSource('plume')) map.removeSource('plume'); } catch(e) {}
+  const center = window.sourceCoords ? window.sourceCoords : [78.9629, 20.5937];
+  const angle = (windDeg + 180) * Math.PI / 180;
+  const dx = Math.cos(angle) * 0.6, dy = Math.sin(angle) * 0.6;
+  const down = [center[0] + dx, center[1] + dy];
+  const circle = { type: 'Feature', geometry: { type: 'Point', coordinates: down } };
+  map.addSource('plume', { type: 'geojson', data: { type: 'FeatureCollection', features: [circle] } });
+  map.addLayer({
+    id: 'plume',
+    type: 'circle',
+    source: 'plume',
+    paint: {
+      'circle-radius': { stops: [[4, 6000], [8, 20000]] },
+      'circle-color': '#7ee8a7',
+      'circle-opacity': 0.08,
+      'circle-stroke-color': '#2ee39a',
+      'circle-stroke-width': 1
+    }
+  });
+}
+
+// --- CLEAR route / markers ---
+document.getElementById('clearBtn').addEventListener('click', () => {
+  window.sourceCoords = null;
+  window.destCoords = null;
+  if (sourceMarker) { sourceMarker.remove(); sourceMarker = null; }
+  if (destMarker) { destMarker.remove(); destMarker = null; }
+  try { if (map.getLayer('route-layer')) map.removeLayer('route-layer'); } catch (e) {}
+  try { if (map.getSource('route')) map.removeSource('route'); } catch (e) {}
+  document.getElementById('analysisPanel').style.display = 'none';
+  document.getElementById('routeInfo').style.display = 'none';
+  sourceInput.value = '';
+  destInput.value = '';
+});
+
+// small console hint
+console.log('ERS Navigation loaded. Click the map to set source/destination or type in inputs and press Enter.');
+</script>
+<!-- ===== ClimaBuddy Chatbot (paste after your main JS) ===== -->
+<style>
+  /* Chat launcher & panel styles (matches white + green theme) */
+  .clima-launcher {
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(180deg,#2ee39a,#00c47a);
+    box-shadow: 0 10px 30px rgba(0,196,122,0.18);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; z-index:1400; border:4px solid #ffffff;
+  }
+  .clima-launcher img { width:34px; height:34px; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.06)); }
+
+  .clima-panel {
+    position: fixed;
+    right: 22px;
+    bottom: 96px;
+    width: 360px;
+    max-height: 70vh;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(6,56,33,0.16);
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    z-index:1400;
+    border: 2px solid #c6ffe6;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .clima-header {
+    background: linear-gradient(90deg,#b8f2d6,#7ee8a7);
+    padding: 12px 14px;
+    display:flex; gap:10px; align-items:center;
+  }
+  .clima-title { font-weight:800; color:#04220f; font-size:15px; margin:0; }
+  .clima-sub { font-size:12px; color:#05422b; opacity:0.9; margin:0; }
+
+  .clima-body {
+    padding:12px; overflow:auto; flex:1; background:#f7fff9;
+  }
+  .clima-msg { max-width:78%; margin-bottom:10px; line-height:1.3; padding:8px 10px; border-radius:10px; display:inline-block; }
+  .clima-msg.user { background: #e6fff2; color:#04220f; margin-left:auto; border:1px solid #c6ffe6; }
+  .clima-msg.bot { background: #ffffff; color:#04220f; border:1px solid #e6f7ee; }
+
+  .clima-footer {
+    padding:10px; display:flex; gap:8px; align-items:center; background:#ffffff; border-top:1px solid #f0fbf0;
+  }
+  .clima-input {
+    flex:1; padding:10px 12px; border-radius:10px; border:1px solid #e6f3ea; font-size:14px; color:#04220f;
+  }
+  .clima-send {
+    background:#00c47a; color:white; border:none; padding:10px 12px; border-radius:10px; font-weight:700; cursor:pointer;
+  }
+  .clima-small {
+    font-size:12px; color:#3b6b54; margin-left:8px;
+  }
+
+  .clima-opts { display:flex; gap:8px; align-items:center; margin-top:8px; }
+  .clima-toggle {
+    display:flex; gap:6px; align-items:center; background:#f0fff7; padding:6px 8px; border-radius:8px; border:1px solid #e6f9ee; color:#044f2f; font-weight:600; font-size:13px;
+    cursor:pointer;
+  }
+
+  .clima-loading { font-size:13px; color:#267a4f; opacity:0.9; margin-top:8px; }
+</style>
+
+<!-- Launcher -->
+<div id="climaLauncher" class="clima-launcher" title="Open ClimaBuddy">
+  <!-- Simple sun icon - inline SVG -->
+  <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'><path d='M6.76 4.84l-1.8-1.79L3.17 4.83l1.79 1.79 1.8-1.78zM1 13h3v-2H1v2zm10-9h2V1h-2v3zm7.03 1.04l1.79-1.79-1.79-1.79-1.79 1.79 1.79 1.79zM17 13h3v-2h-3v2zM6.76 19.16l-1.79 1.79 1.79 1.79 1.8-1.79-1.8-1.79zM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zm4.24 1.76l1.79 1.79 1.79-1.79-1.79-1.79-1.79 1.79zM11 23h2v-3h-2v3z'/></svg>" alt="ClimaBuddy" />
+</div>
+
+<!-- Chat panel -->
+<div id="climaPanel" class="clima-panel" role="dialog" aria-label="ClimaBuddy chatbot">
+  <div class="clima-header">
+    <div>
+      <div class="clima-title">ClimaBuddy</div>
+      <div class="clima-sub">Ask about weather & air quality in plain language</div>
+    </div>
+    <div style="margin-left:auto">
+      <button id="climaClose" style="background:transparent;border:none;cursor:pointer;font-weight:700;color:#04220f">✕</button>
+    </div>
+  </div>
+
+  <div class="clima-body" id="climaBody">
+    <div style="font-size:13px;color:#3b6b54;margin-bottom:8px">Hi — I'm ClimaBuddy. Ask me about the current weather, AQI, or what the numbers mean. Toggle <strong>Use current weather</strong> to include the page's weather as context.</div>
+  </div>
+
+  <div style="padding:10px 12px;background:#ffffff;border-top:1px solid #f0fbf0">
+    <div class="clima-opts">
+      <div id="climaUseContext" class="clima-toggle" title="Include current weather & AQI in question">Use current weather</div>
+      <div style="margin-left:auto;font-size:12px;color:#3b6b54">Powered by OpenWeather</div>
+    </div>
+    <div class="clima-footer">
+      <input id="climaInput" class="clima-input" placeholder="Ask: e.g. 'Is it safe to jog now? Explain AQI'"/>
+      <button id="climaSend" class="clima-send">Ask</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Ensure WEATHER_API_KEY already defined in your page
+  // if not, the assistant will warn user.
+  (function(){
+    const LAUNCHER = document.getElementById('climaLauncher');
+    const PANEL = document.getElementById('climaPanel');
+    const BODY = document.getElementById('climaBody');
+    const INPUT = document.getElementById('climaInput');
+    const SEND = document.getElementById('climaSend');
+    const CLOSE = document.getElementById('climaClose');
+    const USECTX = document.getElementById('climaUseContext');
+
+    let useContext = true;
+    USECTX.addEventListener('click', () => {
+      useContext = !useContext;
+      USECTX.style.background = useContext ? '#e6fff2' : '#fff';
+      USECTX.style.borderColor = useContext ? '#c6ffe6' : '#e6f3ea';
+    });
+
+    LAUNCHER.addEventListener('click', () => {
+      PANEL.style.display = PANEL.style.display === 'flex' ? 'none' : 'flex';
+      PANEL.style.flexDirection = 'column';
+      // scroll to bottom
+      setTimeout(()=> BODY.scrollTop = BODY.scrollHeight, 100);
+    });
+    CLOSE.addEventListener('click', ()=> PANEL.style.display = 'none');
+
+    function appendMessage(text, who='bot') {
+      const d = document.createElement('div');
+      d.className = 'clima-msg ' + (who === 'user' ? 'user' : 'bot');
+      d.textContent = text;
+      BODY.appendChild(d);
+      BODY.scrollTop = BODY.scrollHeight + 200;
+    }
+
+    function appendTyping() {
+      const t = document.createElement('div');
+      t.id = 'climaTyping';
+      t.className = 'clima-msg bot';
+      t.textContent = 'Thinking...';
+      BODY.appendChild(t);
+      BODY.scrollTop = BODY.scrollHeight;
+    }
+    function removeTyping() { const t = document.getElementById('climaTyping'); if (t) t.remove(); }
+
+    // Build context object by reading current page weather & AQ fields if useContext true
+    function buildContext() {
+      if (!useContext) return null;
+      const ctx = {};
+      try {
+        ctx.temp = document.getElementById('temp')?.textContent || '';
+        ctx.humidity = document.getElementById('humidity')?.textContent || '';
+        ctx.wind = document.getElementById('windSpeed')?.textContent || '';
+        ctx.pressure = document.getElementById('pressure')?.textContent || '';
+        ctx.aqi = document.getElementById('aqiValue')?.textContent || '';
+        ctx.pm25 = document.getElementById('pm25')?.textContent || '';
+        ctx.pm10 = document.getElementById('pm10')?.textContent || '';
+        ctx.no2 = document.getElementById('no2')?.textContent || '';
+        ctx.o3 = document.getElementById('o3')?.textContent || '';
+        // Source or destination label if map centered
+        if (window.sourceCoords) ctx.sourceCoords = window.sourceCoords;
+        if (window.destCoords) ctx.destCoords = window.destCoords;
+      } catch(e){}
+      return ctx;
+    }
+
+    // Main send function - calls OpenWeather Weather Assistant
+    // async function sendToAssistant(userText) {
+    //   appendMessage(userText, 'user');
+    //   INPUT.value = '';
+    //   appendTyping();
+
+    //   // Build payload with optional context
+    //   const context = buildContext();
+    //   const payload = { message: userText, context };
+
+    //   // Use provided WEATHER_API_KEY from page if present
+    //   const key = (typeof WEATHER_API_KEY !== 'undefined') ? WEATHER_API_KEY : null;
+    //   if (!key) {
+    //     removeTyping();
+    //     appendMessage('ClimaBuddy needs the OpenWeather API key (WEATHER_API_KEY) in the page to work. I can only show this locally or you can proxy the request via your server.', 'bot');
+    //     return;
+    //   }
+
+    //   // Endpoint user provided (docs): https://openweathermap.org/weather-assistant?apikey={API key}
+    //   // Many OpenWeather assistant endpoints require server-side proxy (CORS). We'll attempt a direct call.
+    //   const url = `https://openweathermap.org/weather-assistant?apikey=${encodeURIComponent(key)}`;
+
+    //   try {
+    //     const resp = await fetch(url, {
+    //       method: 'POST',
+    //       headers: { 'Content-Type': 'application/json' },
+    //       body: JSON.stringify(payload)
+    //     });
+
+    //     removeTyping();
+    //     if (!resp.ok) {
+    //       // Common issue: CORS or 4xx from API. Show friendly fallback message.
+    //       const text = await resp.text().catch(()=>null);
+    //       appendMessage('Sorry — ClimaBuddy could not reach the assistant API from the browser. This usually happens because the API blocks direct browser calls (CORS) or the key is restricted.\\nFallback: try running a tiny proxy on your server, or paste the error below to me so I can help.', 'bot');
+    //       if (text) appendMessage('API reply: ' + text, 'bot');
+    //       return;
+    //     }
+
+    //     const j = await resp.json();
+
+    //     // The exact shape of assistant response may vary; try common fields
+    //     const assistantText = j?.response || j?.answer || j?.message || JSON.stringify(j);
+    //     appendMessage(assistantText, 'bot');
+
+    //   } catch (err) {
+    //     removeTyping();
+    //     console.error('Assistant error', err);
+    //     appendMessage('Network error when contacting assistant. If this is a CORS error, create a small server proxy (example: Node/Express) to forward requests to OpenWeather and keep your key secret.', 'bot');
+    //   }
+    // }
+
+//     async function sendToAssistant(message, useContext = false) {
+//     const chatBox = document.getElementById("chatMessages");
+
+//     // Show user message
+//     addChatBubble(message, "user");
+
+//     // Build payload for OpenWeather Assistant
+//     const payload = {
+//         message: message,
+//         weather: useContext ? window.currentWeatherContext || null : null
+//     };
+
+//     try {
+//         // 🚀 CALL YOUR LOCAL SERVER NOT THE REAL API (fixes CORS)
+//         const resp = await fetch("http://localhost:3000/assistant", {
+//             method: "POST",
+//             headers: { "Content-Type": "application/json" },
+//             body: JSON.stringify(payload)
+//         });
+
+//         if (!resp.ok) {
+//             addChatBubble("Assistant error: " + resp.statusText, "bot");
+//             return;
+//         }
+
+//         const data = await resp.json();
+
+//         addChatBubble(data.reply || "No response from assistant", "bot");
+
+//     } catch (err) {
+//         console.error("Assistant error", err);
+//         addChatBubble("Network error while contacting assistant.", "bot");
+//     }
+// }
+// REPLACE your old sendToAssistant WITH THIS function
+async function sendToAssistant(userText) {
+  // show user bubble (existing helper in your UI)
+  try {
+    // If you used appendMessage / addChatBubble earlier, keep the same call.
+    // Fallback: simple append to the panel if those helpers are not present.
+    if (typeof appendMessage === 'function') appendMessage(userText, 'user');
+    else {
+      const el = document.createElement('div'); el.className='clima-msg user'; el.textContent = userText;
+      document.getElementById('climaBody').appendChild(el);
+    }
+  } catch(e){ console.warn('UI append failed', e); }
+
+  // build payload (include page context if user enabled 'Use current weather')
+  const context = (typeof buildContext === 'function') ? buildContext() : null;
+  const payload = { message: userText, context };
+
+  // Show a typing indicator
+  appendTyping?.();
+
+  try {
+    // <-- IMPORTANT: call your local proxy here (not OpenWeather directly) -->
+    const resp = await fetch('http://localhost:3000/assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    removeTyping?.();
+
+    if (!resp.ok) {
+      // show error to user
+      const txt = await resp.text().catch(()=>resp.statusText || 'Error');
+      const msg = 'Assistant proxy error: ' + (resp.status + ' ' + resp.statusText) + (txt ? ' — ' + txt : '');
+      if (typeof appendMessage === 'function') appendMessage(msg, 'bot');
+      else {
+        const el = document.createElement('div'); el.className='clima-msg bot'; el.textContent = msg;
+        document.getElementById('climaBody').appendChild(el);
+      }
+      return;
+    }
+
+    // // parse response (proxy just forwards OpenWeather response body)
+    // const text = await resp.text();
+    // // Try parse JSON else use text
+    // let assistantReply = text;
+    // try { const j = JSON.parse(text); assistantReply = j.response || j.answer || j.message || JSON.stringify(j); } catch(e){}
+
+    // if (typeof appendMessage === 'function') appendMessage(assistantReply, 'bot');
+    // else {
+    //   const el = document.createElement('div'); el.className='clima-msg bot'; el.textContent = assistantReply;
+    //   document.getElementById('climaBody').appendChild(el);
+    // }
+        // SAFER parsing of proxy response (prefer JSON.reply, fallback to truncated text)
+    let assistantReply = 'No reply from assistant';
+
+    if (!resp.ok) {
+      // Non-200 from proxy: read small preview for debug, but show friendly message
+      const errPreview = await resp.text().catch(()=> '');
+      assistantReply = `Assistant proxy error: ${resp.status} ${resp.statusText}` + (errPreview ? ' — ' + errPreview.slice(0,300) : '');
+    } else {
+      // Try parse JSON first (expected shape: { reply: "..." })
+      try {
+        const j = await resp.json();
+        assistantReply = j.reply || j.response || j.answer || j.message || (typeof j === 'string' ? j : JSON.stringify(j).slice(0,1000));
+      } catch (jsonErr) {
+        // Not JSON — fallback to text but truncate so we don't dump huge HTML
+        const txt = await resp.text().catch(()=> '');
+        assistantReply = txt ? txt.slice(0,1500) : 'Assistant returned an empty response';
+      }
+    }
+
+    if (typeof appendMessage === 'function') appendMessage(assistantReply, 'bot');
+    else {
+      const el = document.createElement('div');
+      el.className = 'clima-msg bot';
+      el.textContent = assistantReply;
+      document.getElementById('climaBody').appendChild(el);
+    }
+
+
+  } catch (err) {
+    removeTyping?.();
+    console.error('Assistant error', err);
+    const msg = 'Network error contacting assistant proxy. Is server running at http://localhost:3000 ?';
+    if (typeof appendMessage === 'function') appendMessage(msg, 'bot');
+    else {
+      const el = document.createElement('div'); el.className='clima-msg bot'; el.textContent = msg;
+      document.getElementById('climaBody').appendChild(el);
+    }
+  }
+}
+
+    // Enter or click
+    SEND.addEventListener('click', ()=> {
+      const v = INPUT.value.trim();
+      if (!v) return;
+      sendToAssistant(v);
+    });
+    INPUT.addEventListener('keydown', (e)=> {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); SEND.click(); }
+    });
+
+    // Small helpful button: when user selects "Use current weather", prefill a suggested question
+    USECTX.addEventListener('dblclick', ()=> {
+      const ctx = buildContext();
+      if (!ctx) {
+        appendMessage('No context available yet. Set Source/Destination or load current weather then try again.', 'bot');
+        return;
+      }
+      const suggested = `Explain current weather & AQI in simple terms. Current temp: ${ctx.temp}, AQI: ${ctx.aqi}, PM2.5: ${ctx.pm25}. Should I go for a run?`;
+      INPUT.value = suggested;
+      INPUT.focus();
+    });
+
+    // Accessibility: recover if panel hidden on small screens
+    window.addEventListener('resize', ()=> {
+      if (window.innerWidth < 420) {
+        PANEL.style.right = '12px';
+        PANEL.style.width = '92%';
+      } else {
+        PANEL.style.right = '22px';
+        PANEL.style.width = '360px';
+      }
+    });
+
+  })();
+</script>
+
+</body>
+</html>
