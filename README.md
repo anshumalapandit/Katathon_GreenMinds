@@ -606,31 +606,6 @@ git push origin feature/amazing-feature
 
 ---
 
-## 🗺️ Roadmap
-
-### Phase 1 (Current) ✅
-- [x] Core routing & AQI display
-- [x] Health-personalized routes
-- [x] Eco coins system
-- [x] Voice assistant
-- [x] Donation system
-
-### Phase 2 (Planned)
-- [ ] Offline maps support
-- [ ] Advanced health analytics
-- [ ] Integration with public transport
-- [ ] Community features
-- [ ] Mobile app (React Native)
-
-### Phase 3 (Future)
-- [ ] AI-powered route optimization
-- [ ] Multi-city expansion
-- [ ] Government partnerships
-- [ ] Real-time traffic alerts
-- [ ] Carbon credit trading
-
----
-
 ## 📞 Support & Contact
 
 - **Report a Bug** - Open an [Issue](https://github.com/anshumalapandit/Katathon_GreenMinds/issues)
