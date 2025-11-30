@@ -3,7 +3,6 @@
 <div align="center">
 
 ![eco Yatra](https://img.shields.io/badge/Status-Active-brightgreen)
-![License](https://img.shields.io/badge/License-MIT-blue)
 ![React](https://img.shields.io/badge/React-18.3.1-blue?logo=react)
 ![Vite](https://img.shields.io/badge/Vite-7.1.2-purple?logo=vite)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9.2-blue)
